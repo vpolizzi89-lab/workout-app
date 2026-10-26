@@ -21,6 +21,7 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#161a22;paddi
 #toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#4ade80;color:#111;padding:10px 18px;border-radius:20px;font-weight:700;display:none;z-index:20}
 .mini{min-height:34px;padding:6px 12px;font-size:14px;margin-right:6px}pre{white-space:pre-wrap;font-family:inherit;background:#0f1115;padding:10px;border-radius:10px}
 #syncst{position:absolute;right:14px;top:16px;font-size:12px;color:#9aa3b2;max-width:45%;text-align:right}#syncst.err{color:#f87171}
+.kv{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}.kv div{background:#0f1115;border-radius:10px;padding:8px}.kv b{display:block;font-size:17px}.kv span{color:#9aa3b2;font-size:12px}.dl{color:#9aa3b2;font-size:12px}.up{color:#4ade80}.dn{color:#f87171}details summary{cursor:pointer;color:#9aa3b2;margin-top:8px}
 canvas{width:100%;height:180px;background:#0f1115;border-radius:10px}
 </style></head><body>
 <header><div id="syncst" onclick="view='settings';render()"></div><h1 id="title">Workout</h1><div class="sub" id="subtitle"></div></header>
@@ -38,9 +39,9 @@ const DEFAULT_PLAN={
 0:{name:"Rest / easy bike",type:"cardio",note:"Rest, or 20 min easy indoor bike"}};
 const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const K="vwt_v1";
-let S=load();function load(){try{const d=JSON.parse(localStorage.getItem(K));if(d&&d.plan)return d}catch(e){}return{plan:JSON.parse(JSON.stringify(DEFAULT_PLAN)),sessions:[],cardio:[],body:[],draft:{}}}
+let S=load();function load(){try{const d=JSON.parse(localStorage.getItem(K));if(d&&d.plan)return d}catch(e){}return{plan:JSON.parse(JSON.stringify(DEFAULT_PLAN)),sessions:[],cardio:[],body:[],daily:[],draft:{}}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
-function persist(){["sessions","cardio","body"].forEach(t=>(S[t]=S[t]||[]).forEach(r=>{if(!r.id)r.id=uid()}));localStorage.setItem(K,JSON.stringify(S))}
+function persist(){["sessions","cardio","body","daily"].forEach(t=>(S[t]=S[t]||[]).forEach(r=>{if(!r.id)r.id=uid()}));localStorage.setItem(K,JSON.stringify(S))}
 function save(){persist();schedSync()}persist();
 const ld=d=>{const x=d||new Date();return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")},today=()=>ld();
 let day=new Date().getDay(),view="today",$=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -86,15 +87,35 @@ h+='<div class="card"><h2>Cardio</h2>'+(S.cardio.map((c,i)=>[c,i]).slice(-15).re
 $("#main").innerHTML=h;drawEx()}
 function delSess(i){if(confirm("Delete this workout?")){S.sessions.splice(i,1);save();rHist()}}
 function chart(cv,pts,color){const r=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;cv.width=W*r;cv.height=H*r;const c=cv.getContext("2d");c.scale(r,r);c.fillStyle="#9aa3b2";c.font="12px sans-serif";
-if(pts.length<1){c.fillText("No data yet",10,24);return}const ys=pts.map(p=>p.y),mn=Math.min(...ys)-5,mx=Math.max(...ys)+5,P=30;
+if(pts.length<1){c.fillText("No data yet",10,24);return}const ys=pts.map(p=>p.y),sp=(Math.max(...ys)-Math.min(...ys))||2,mn=Math.min(...ys)-sp*.1,mx=Math.max(...ys)+sp*.1,P=30;
 const X=i=>P+(pts.length==1?(W-2*P)/2:i*(W-2*P)/(pts.length-1)),Y=v=>H-P+-(v-mn)/(mx-mn)*(H-2*P);
-c.fillText(mx.toFixed(0),2,P);c.fillText(mn.toFixed(0),2,H-P);c.strokeStyle=color;c.lineWidth=2.5;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(X(i),Y(p.y)):c.moveTo(X(i),Y(p.y)));c.stroke();
-c.fillStyle=color;pts.forEach((p,i)=>{c.beginPath();c.arc(X(i),Y(p.y),4,0,7);c.fill()});c.fillStyle="#9aa3b2";c.fillText(pts[0].x,P,H-8);if(pts.length>1)c.fillText(pts[pts.length-1].x,W-P-70,H-8)}
+const fx=v=>mx-mn<10?v.toFixed(1):v.toFixed(0);c.fillText(fx(mx),2,P);c.fillText(fx(mn),2,H-P);c.strokeStyle=color;c.lineWidth=2.5;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(X(i),Y(p.y)):c.moveTo(X(i),Y(p.y)));c.stroke();
+c.fillStyle=color;pts.forEach((p,i)=>{if(pts.length<=40||i==pts.length-1){c.beginPath();c.arc(X(i),Y(p.y),pts.length>40?4:3.5,0,7);c.fill()}});c.fillStyle="#9aa3b2";c.fillText(pts[0].x,P,H-8);if(pts.length>1)c.fillText(pts[pts.length-1].x,W-P-70,H-8)}
 function drawEx(){const n=$("#hx")&&$("#hx").value,pts=[];S.sessions.forEach(s=>{const e=s.ex.find(x=>x.name===n);if(e){const d=e.sets.filter(x=>x.done);if(d.length)pts.push({x:s.date,y:Math.max(...d.map(x=>x.w))})}});chart($("#cv"),pts,"#ff7a1a")}
-function rBody(){$("#title").textContent="Body weight";$("#subtitle").textContent="Watch the weekly trend, not single readings";
-$("#main").innerHTML=`<div class="card"><div class="row"><input id="bw" inputmode="decimal" placeholder="Weight (lb)"><input id="bf" inputmode="decimal" placeholder="Body fat %"></div><button class="primary" style="width:100%;margin-top:8px" onclick="logBody()">Save</button></div><div class="card"><canvas id="bc"></canvas>${S.body.slice(-10).reverse().map(b=>`<div class="sub">${b.date} · ${b.w} lb${b.bf?" · "+b.bf+"%":""}</div>`).join("")}</div>`;
-chart($("#bc"),S.body.map(b=>({x:b.date,y:+b.w})),"#4ade80")}
-function logBody(){const w=$("#bw").value;if(!w)return;S.body.push({date:today(),w:+w,bf:$("#bf").value});save();rBody()}
+const BF=[["w","Weight","lb",1],["bf","Body fat","%",1],["bfm","Fat mass","lb",1],["ffp","Fat-free","%",1],["ffm","Fat-free mass","lb",1],["smp","Skeletal muscle","%",1],["smm","Skeletal muscle","lb",1],["mp","Muscle","%",1],["mm","Muscle mass","lb",1],["bone","Bone mass","lb",1],["water","Body water","lb",1],["bmr","BMR","kcal",0]];
+const BG={w:-1,bf:-1,bfm:-1,smm:1,smp:1,ffm:1,ffp:1,mm:1,mp:1};let bRange=90,bMet="w";
+const num=v=>v===""||v==null||isNaN(+v)?null:+v;
+function bSorted(){return S.body.filter(b=>num(b.w)).slice().sort((x,y)=>String(x.date).localeCompare(String(y.date)))}
+function inRange(d,days){if(!days)return true;const t=new Date();t.setDate(t.getDate()-days);return d>=t.toISOString().slice(0,10)}
+function rBody(){$("#title").textContent="Body";$("#subtitle").textContent="Samsung Health weigh-ins sync in automatically";
+const L=bSorted(),last=L[L.length-1],dA=n=>{const t=new Date(last.date);t.setDate(t.getDate()-n);return t.toISOString().slice(0,10)},prev=last&&[...L].reverse().find(b=>b.date<=dA(21)&&b.date>=dA(60));
+const cell=([k,n,u,dp])=>{const v=num(last[k]);if(!v)return"";const p=prev&&num(prev[k]);let dl="";if(p){const d=v-p,g=BG[k];dl=`<span class="dl ${g&&Math.abs(d)>=.05?(d*g>0?"up":"dn"):""}">${d>0?"+":""}${d.toFixed(dp)} / 4 wk</span>`}return`<div><span>${n}${u==="%"?" %":""}</span><b>${v.toFixed(dp)}${u==="%"?"%":u==="lb"?" lb":""}</b>${dl}</div>`};
+const met=BF.filter(([k])=>L.some(b=>num(b[k])));
+const D=(S.daily||[]).slice().sort((x,y)=>String(x.date).localeCompare(String(y.date))),dl7=D.slice(-7),av=k=>{const v=dl7.map(x=>num(x[k])).filter(x=>x);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+const dl=D.length?`<div class="card"><h2>Daily activity</h2><div class="sub">7-day average</div><div class="kv">${[["steps","Steps",0],["sleep","Sleep h",1],["hr","Avg HR",0]].map(([k,n,dp])=>{const v=av(k);return v?`<div><span>${n}</span><b>${v.toLocaleString("en-US",{maximumFractionDigits:dp})}</b></div>`:""}).join("")}</div>
+<details><summary>Last 14 days</summary>${D.slice(-14).reverse().map(x=>`<div class="sub">${x.date} · ${x.steps?(+x.steps).toLocaleString()+" steps":""}${x.sleep?" · "+x.sleep+" h sleep":""}${x.hr?" · avg HR "+x.hr:""}${x.rhr?" · low "+x.rhr:""}</div>`).join("")}</details></div>`:"";
+$("#main").innerHTML=(last?`<div class="card"><h2>Latest · ${last.date}${last.t?" "+last.t:""}</h2><div class="sub">${last.src||"Manual"} · change vs ~4 weeks earlier</div><div class="kv">${BF.map(cell).join("")}</div></div>`:"")+
+`<div class="card"><h2>Trends</h2><div class="row">${[["w","Weight"],["bf","Body fat %"],["smm","Muscle"]].concat(met.filter(([k])=>!["w","bf","smm"].includes(k)).length?[["more","More…"]]:[]).map(([k,n])=>`<button class="mini ${bMet===k?"on":""}" onclick="bMet='${k}';rBody()">${n}</button>`).join("")}</div>
+${bMet==="more"||!["w","bf","smm"].includes(bMet)?`<select id="bms" style="margin-top:8px" onchange="bMet=this.value;rBody()">${met.map(([k,n,u])=>`<option value="${k}" ${k===bMet?"selected":""}>${n} (${u})</option>`).join("")}</select>`:""}
+<div class="row">${[[30,"30d"],[90,"90d"],[365,"1y"],[0,"All"]].map(([d,n])=>`<button class="mini ${bRange===d?"on":""}" onclick="bRange=${d};rBody()">${n}</button>`).join("")}</div><canvas id="bc" style="margin-top:8px"></canvas></div>
+<div class="card"><h2>Log a weigh-in</h2><div class="row"><input id="bw" inputmode="decimal" placeholder="Weight (lb) *"><input id="bf" inputmode="decimal" placeholder="Body fat %"></div>
+<details><summary>More fields (optional)</summary><div class="row"><input id="bsmm" inputmode="decimal" placeholder="Skel. muscle lb"><input id="bwater" inputmode="decimal" placeholder="Body water lb"></div><div class="row"><input id="bbmr" inputmode="decimal" placeholder="BMR kcal"><input id="bdate" type="date" value="${today()}"></div></details>
+<button class="primary" style="width:100%;margin-top:8px" onclick="logBody()">Save</button></div>`+dl+
+`<div class="card"><h2>History</h2>${L.slice().reverse().slice(0,60).map(b=>`<div class="sub">${b.date} · <b style="color:#e8eaed">${(+b.w).toFixed(1)} lb</b>${num(b.bf)?" · "+(+b.bf).toFixed(1)+"% fat":""}${num(b.smm)?" · "+(+b.smm).toFixed(1)+" lb muscle":""}</div>`).join("")||'<div class="sub">No weigh-ins yet</div>'}${L.length>60?`<div class="sub">…and ${L.length-60} older</div>`:""}</div>`;
+if(bMet==="more")bMet=$("#bms").value;
+const k=bMet,pts=L.filter(b=>inRange(b.date,bRange)&&num(b[k])).map(b=>({x:b.date,y:+b[k]}));chart($("#bc"),pts,k==="bf"||k==="bfm"?"#f87171":k==="w"?"#4ade80":"#60a5fa")}
+function logBody(){const w=num($("#bw").value);if(!w)return alert("Enter your weight");const d=$("#bdate").value||today();let b=S.body.find(x=>x.date===d);if(!b){b={date:d};S.body.push(b);S.body.sort((x,y)=>String(x.date).localeCompare(String(y.date)))}
+b.w=w;[["bf","bf"],["bsmm","smm"],["bwater","water"],["bbmr","bmr"]].forEach(([i,k])=>{const v=num($("#"+i).value);if(v)b[k]=v});b.src="Manual";save();rBody()}
 function rSet(){$("#title").textContent="More";$("#subtitle").textContent="Backup, import, edit exercises";
 let h=`<div class="card"><h2>Google Drive sync</h2><div class="sub" id="systat"></div><input id="syurl" placeholder="Apps Script web app URL" value="${esc(SY.url||"")}" style="margin-top:8px"><input id="sytok" type="password" placeholder="Sync token" value="${esc(SY.token||"")}" style="margin-top:8px"><div class="row"><button class="primary" onclick="syConnect($('#syurl').value.trim(),$('#sytok').value.trim())">Save & sync</button><button onclick="sync(true)">Sync now</button></div>${SY.url?'<div class="row"><button onclick="if(confirm(\'Disconnect Drive sync? Data on this phone is kept.\')){SY={};sySave();rSet();syStatus()}">Disconnect</button></div>':""}</div><div class="card"><h2>Backup</h2><div class="row"><button onclick="exp('json')">Export JSON</button><button onclick="exp('csv')">Export CSV</button></div><div class="row"><button onclick="$('#imp').click()">Import JSON</button><button onclick="share()">Share</button></div><input type="file" id="imp" accept=".json,application/json" style="display:none" onchange="imp(this)"></div>`;
 h+=`<div class="card"><h2>Edit exercises</h2><select id="ed" onchange="rEd()">${[1,2,4,5].map(d=>`<option value="${d}">${DN[d]} · ${esc(S.plan[d].name)}</option>`).join("")}</select><div id="edl"></div></div><div class="card"><button onclick="if(confirm('Reset plan to default? History is kept.')){S.plan=JSON.parse(JSON.stringify(DEFAULT_PLAN));S.draft={};save();rSet()}">Reset plan to default</button></div>`;
@@ -107,7 +128,7 @@ async function blob(t){const ms=await mAll();if(t==="csv")return new Blob([csv()
 function mealCsv(ms){return ms.map(m=>"\n"+[m.date,"meal",m.type,"","",m.cal??"",(m.prot!=null&&m.prot!==""?m.prot+"g protein ":"")+new Date(m.ts).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})+" "+(m.note||"")].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("")}
 async function exp(t){const a=document.createElement("a");a.href=URL.createObjectURL(await blob(t));a.download="workout-log-"+today()+"."+t;a.click()}
 async function share(){const f=new File([await blob("json")],"workout-log-"+today()+".json",{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:"Workout log"});else exp("json")}
-function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(async t=>{const d=JSON.parse(t);if(!d.sessions||!d.plan)throw 0;const ml=d.meals||[];delete d.meals;S=Object.assign({cardio:[],body:[],draft:{}},d);save();for(const m of ml){m.img=m.img?await (await fetch(m.img)).blob():null;await mPut(m)}schedSync();alert("Imported "+S.sessions.length+" workouts");render()}).catch(()=>alert("Not a valid backup file"))}
+function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(async t=>{const d=JSON.parse(t);if(!d.sessions||!d.plan)throw 0;const ml=d.meals||[];delete d.meals;S=Object.assign({cardio:[],body:[],daily:[],draft:{}},d);save();for(const m of ml){m.img=m.img?await (await fetch(m.img)).blob():null;await mPut(m)}schedSync();alert("Imported "+S.sessions.length+" workouts");render()}).catch(()=>alert("Not a valid backup file"))}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
 // ---- Meals (IndexedDB) ----
@@ -154,7 +175,7 @@ function syReset(){SY.since=0;SY.sh={};SY.dirty={};SY.ut={};SY.err=null;SY.last=
 function syConnect(url,token){if(!/^https?:\/\//.test(url)||!token){alert("Enter the web app URL and token");return}if(url!==SY.url||token!==SY.token){SY.url=url;SY.token=token;syReset();sySave()}sync(true)}
 async function api(body){const r=await fetch(SY.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({source:"app"},body,{token:SY.token})),redirect:"follow",cache:"no-store"});
  if(!r.ok)throw new Error("HTTP "+r.status);let j;try{j=await r.json()}catch(e){throw new Error("Bad response (check URL / deployment access)")}if(!j.ok)throw new Error(j.error||"error");return j}
-async function localRecs(){const m={};["sessions","cardio","body"].forEach(t=>S[t].forEach(r=>m[t+":"+r.id]={type:t,id:r.id,data:r}));m["plan:plan"]={type:"plan",id:"plan",data:{plan:S.plan}};
+async function localRecs(){const m={};["sessions","cardio","body","daily"].forEach(t=>S[t].forEach(r=>m[t+":"+r.id]={type:t,id:r.id,data:r}));m["plan:plan"]={type:"plan",id:"plan",data:{plan:S.plan}};
  (await mAll()).forEach(x=>{const{img,...d}=x;delete d.updatedAt;m["meals:"+x.id]={type:"meals",id:x.id,data:d,rec:x}});return m}
 function scan(L){SY.sh=SY.sh||{};SY.dirty=SY.dirty||{};SY.ut=SY.ut||{};const now=Date.now();
  for(const k in L){const h=JSON.stringify(L[k].data);if(SY.sh[k]===h)delete SY.dirty[k];else if(!SY.dirty[k])SY.dirty[k]=(k==="plan:plan"&&!(k in SY.sh)&&!SY.ut[k])?1:Math.max(now,(SY.ut[k]||0)+1)}

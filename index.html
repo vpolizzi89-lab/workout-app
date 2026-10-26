@@ -13,7 +13,9 @@ button.on,.primary{background:#ff7a1a;color:#111;font-weight:700}
 .set{display:grid;grid-template-columns:28px 1fr 1fr 64px;gap:8px;align-items:center;margin-top:8px}
 input,textarea,select{width:100%;background:#0f1115;color:#fff;border:1px solid #333b4a;border-radius:10px;padding:12px;font-size:17px}
 .set button.done{background:#16a34a;color:#fff}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#161a22;padding:8px;gap:6px}nav button{flex:1}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#161a22;padding:8px;gap:6px}nav button{flex:1;padding:10px 2px;font-size:13px}
+.meal{display:flex;gap:10px;margin-top:10px;border-top:1px solid #2a3140;padding-top:10px}.meal img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:0 0 auto}.meal .r{flex:1;min-width:0}.meal input{padding:8px;font-size:15px}
+.big{width:100%;font-size:18px;padding:18px}.bar{height:10px;background:#2a3140;border-radius:6px;overflow:hidden;margin-top:6px}.bar div{height:100%;background:#4ade80}
 #timer{position:fixed;bottom:72px;left:12px;right:12px;background:#ff7a1a;color:#111;border-radius:14px;padding:12px 16px;display:none;justify-content:space-between;align-items:center;font-weight:700;font-size:22px;z-index:9}
 #timer button{background:#111;color:#fff}.row{display:flex;gap:8px;margin-top:8px}.row>*{flex:1}
 #toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#4ade80;color:#111;padding:10px 18px;border-radius:20px;font-weight:700;display:none;z-index:20}
@@ -23,7 +25,7 @@ canvas{width:100%;height:180px;background:#0f1115;border-radius:10px}
 <header><h1 id="title">Workout</h1><div class="sub" id="subtitle"></div></header>
 <main id="main"></main>
 <div id="toast">Copied</div><div id="timer"><span id="tleft">2:00</span><span><button id="tadd">+30s</button> <button id="tskip">Skip</button></span></div>
-<nav><button data-v="today" class="on">Workout</button><button data-v="history">History</button><button data-v="body">Body</button><button data-v="settings">More</button></nav>
+<nav><button data-v="today" class="on">Workout</button><button data-v="history">History</button><button data-v="meals">Meals</button><button data-v="body">Body</button><button data-v="settings">More</button></nav>
 <script>
 const DEFAULT_PLAN={
 1:{name:"Upper A",type:"lift",rest:120,ex:[["Chest press",4,6,8],["Lat pulldown",4,6,8],["Shoulder press",3,8,10],["Seated row",3,8,10],["Biceps curl machine",2,8,10],["Triceps press",2,8,10]]},
@@ -37,13 +39,13 @@ const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const K="vwt_v1";
 let S=load();function load(){try{const d=JSON.parse(localStorage.getItem(K));if(d&&d.plan)return d}catch(e){}return{plan:JSON.parse(JSON.stringify(DEFAULT_PLAN)),sessions:[],cardio:[],body:[],draft:{}}}
 function save(){localStorage.setItem(K,JSON.stringify(S))}
-const today=()=>new Date().toISOString().slice(0,10);
+const ld=d=>{const x=d||new Date();return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")},today=()=>ld();
 let day=new Date().getDay(),view="today",$=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function lastFor(name){for(let i=S.sessions.length-1;i>=0;i--){const e=S.sessions[i].ex.find(x=>x.name===name&&x.sets.some(s=>s.done));if(e)return e}return null}
 function suggestion(ex){const l=lastFor(ex[0]);if(!l)return null;const d=l.sets.filter(s=>s.done);if(d.length>=ex[1]&&d.every(s=>+s.reps>=ex[3])){const w=Math.max(...d.map(s=>+s.w||0));return w+5}return null}
 function draftKey(){return today()+"_"+day}
 function getDraft(){const k=draftKey(),p=S.plan[day];if(!S.draft[k]){S.draft={};S.draft[k]={ex:p.ex.map(e=>{const l=lastFor(e[0]),sg=suggestion(e);return{name:e[0],sets:Array.from({length:e[1]},(_,i)=>({w:sg??(l&&l.sets[i]?l.sets[i].w:(l?l.sets[0].w:"")),reps:l&&l.sets[i]?l.sets[i].reps:e[2],done:false}))}})}}return S.draft[k]}
-function render(){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===view));({today:rToday,history:rHist,body:rBody,settings:rSet})[view]()}
+function render(){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===view));({today:rToday,history:rHist,body:rBody,settings:rSet,meals:rMeals})[view]()}
 function rToday(){const p=S.plan[day];$("#title").textContent=DN[day]+" · "+p.name;$("#subtitle").textContent=p.type==="lift"?`Rest ${p.rest}s · leave ~2 reps in reserve`:p.note||"";
 let h='<div class="days">'+[1,2,3,4,5,6,0].map(d=>`<button class="${d==day?"on":""}" onclick="day=${d};render()">${DN[d]}</button>`).join("")+"</div>";
 if(p.type==="lift"){const dr=getDraft();save();p.ex.forEach((e,i)=>{const sg=suggestion(e),l=lastFor(e[0]);h+=`<div class="card"><h2>${esc(e[0])}</h2><div class="sub">${e[1]} × ${e[2]}${e[3]!=e[2]?"-"+e[3]:""}${l?" · last: "+l.sets.filter(s=>s.done).map(s=>s.w+"×"+s.reps).join(", "):""}</div>${sg?`<div class="sug">▲ Hit top of range — try ${sg} lb</div>`:""}`;
@@ -98,11 +100,49 @@ function rEd(){const d=$("#ed").value,p=S.plan[d];$("#edl").innerHTML=`<div clas
 function setN(d,i,k,v){S.plan[d].ex[i][k]=Math.max(1,+v||1);S.draft={};save()}
 function csv(){let r=["date,workout,exercise,set,weight_lb,reps,done"];S.sessions.forEach(s=>s.ex.forEach(e=>e.sets.forEach((x,i)=>r.push([s.date,s.day,e.name,i+1,x.w,x.reps,x.done].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")))));
 S.cardio.forEach(c=>r.push(['"'+c.date+'"','"cardio"','"'+c.kind+'"','""','""','""','"'+c.min+' min '+c.dist+' mi '+String(c.notes).replace(/"/g,'""')+'"'].join(",")));S.body.forEach(b=>r.push(`"${b.date}","bodyweight","",,"${b.w}","","${b.bf}"`));return r.join("\n")}
-function blob(t){return t==="csv"?new Blob([csv()],{type:"text/csv"}):new Blob([JSON.stringify(S,null,1)],{type:"application/json"})}
-function exp(t){const a=document.createElement("a");a.href=URL.createObjectURL(blob(t));a.download="workout-log-"+today()+"."+t;a.click()}
-async function share(){const f=new File([blob("json")],"workout-log-"+today()+".json",{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:"Workout log"});else exp("json")}
-function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(t=>{const d=JSON.parse(t);if(!d.sessions||!d.plan)throw 0;S=Object.assign({cardio:[],body:[],draft:{}},d);save();alert("Imported "+S.sessions.length+" workouts");render()}).catch(()=>alert("Not a valid backup file"))}
+async function blob(t){const ms=await mAll();if(t==="csv")return new Blob([csv()+mealCsv(ms)],{type:"text/csv"});const out=Object.assign({},S,{meals:await Promise.all(ms.map(async m=>Object.assign({},m,{img:m.img?await b2d(m.img):null})))});return new Blob([JSON.stringify(out,null,1)],{type:"application/json"})}
+function mealCsv(ms){return ms.map(m=>"\n"+[m.date,"meal",m.type,"","",m.cal??"",(m.prot!=null&&m.prot!==""?m.prot+"g protein ":"")+new Date(m.ts).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})+" "+(m.note||"")].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("")}
+async function exp(t){const a=document.createElement("a");a.href=URL.createObjectURL(await blob(t));a.download="workout-log-"+today()+"."+t;a.click()}
+async function share(){const f=new File([await blob("json")],"workout-log-"+today()+".json",{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:"Workout log"});else exp("json")}
+function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(async t=>{const d=JSON.parse(t);if(!d.sessions||!d.plan)throw 0;const ml=d.meals||[];delete d.meals;S=Object.assign({cardio:[],body:[],draft:{}},d);save();for(const m of ml){m.img=m.img?await (await fetch(m.img)).blob():null;await mPut(m)}alert("Imported "+S.sessions.length+" workouts");render()}).catch(()=>alert("Not a valid backup file"))}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
+// ---- Meals (IndexedDB) ----
+let dbp;function db(){return dbp||(dbp=new Promise((ok,no)=>{const r=indexedDB.open("vwt_meals",1);r.onupgradeneeded=()=>r.result.createObjectStore("meals",{keyPath:"id"});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
+async function tx(mode,fn){const d=await db();return new Promise((ok,no)=>{const t=d.transaction("meals",mode),st=t.objectStore("meals");const r=fn(st);t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>no(t.error)})}
+const mPut=m=>tx("readwrite",st=>st.put(m)),mDel=id=>tx("readwrite",st=>st.delete(id)),mAll=async()=>((await tx("readonly",st=>st.getAll()))||[]).sort((a,b)=>a.ts-b.ts);
+const b2d=b=>new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(r.result);r.readAsDataURL(b)});
+async function compress(file){const bmp=await createImageBitmap(file).catch(async()=>{const i=new Image();i.src=URL.createObjectURL(file);await i.decode();return i});const k=Math.min(1,1024/Math.max(bmp.width,bmp.height)),c=document.createElement("canvas");c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);return new Promise(ok=>c.toBlob(ok,"image/jpeg",0.75))}
+function defType(){const h=new Date().getHours();return h<10.5?"Breakfast":h<15?"Lunch":h>=17&&h<21?"Dinner":"Snack"}
+let mDay=null,urls=[];
+const tStr=ts=>new Date(ts).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+function mealText(m){let t="Meal log: "+fmtDate(m.date)+", "+tStr(m.ts)+", "+m.type+".";if(m.note)t+=" Note: "+m.note.trim()+(/[.!?]$/.test(m.note.trim())?"":".");if(m.cal)t+=" Calories: "+m.cal+".";if(m.prot)t+=" Protein: "+m.prot+" g.";return t}
+const mFile=(m,i)=>new File([m.img],`meal-${m.date}-${m.type.toLowerCase()}${i!=null?"-"+(i+1):""}.jpg`,{type:"image/jpeg"});
+function dl(m){const a=document.createElement("a");a.href=URL.createObjectURL(m.img);a.download=mFile(m).name;a.click()}
+async function shareMeals(ms,title,text){const files=ms.filter(m=>m.img).map((m,i)=>mFile(m,ms.length>1?i:null));
+if(navigator.share&&navigator.canShare&&files.length&&navigator.canShare({files})){try{await navigator.share({files,title,text});return}catch(e){if(e.name==="AbortError")return}}
+await shareText(title,text);if(files.length&&confirm(`Photo sharing isn't supported here. Download ${files.length>1?"the "+files.length+" photos":"the photo"} so you can attach ${files.length>1?"them":"it"}?`))ms.forEach(m=>m.img&&dl(m))}
+async function shareMeal(id){const m=(await mAll()).find(x=>x.id===id);shareMeals([m],"Meal log",mealText(m))}
+async function shareDay(){const ms=(await mAll()).filter(m=>m.date===mDay);if(!ms.length)return toast("No meals");const tot=totals(ms);
+const txt=`Meals for ${fmtDate(mDay)} (${ms.length}):\n`+ms.map(m=>"- "+mealText(m).replace(/^Meal log: [^,]+, [^,]+, [^,]+, /,"")).join("\n")+(tot.c||tot.p?`\nLogged totals: ${tot.c?tot.c+" cal":""}${tot.c&&tot.p?", ":""}${tot.p?tot.p+" g protein":""}`:"");shareMeals(ms,"Today's meals",txt)}
+function totals(ms){return ms.reduce((a,m)=>({c:a.c+(+m.cal||0),p:a.p+(+m.prot||0)}),{c:0,p:0})}
+async function addMeal(inp){const f=inp.files[0];if(!f)return;toast("Saving...");const img=await compress(f);const now=new Date();
+await mPut({id:now.getTime()+"-"+Math.random().toString(36).slice(2,6),ts:now.getTime(),date:ld(now),type:$("#mt").value,note:$("#mn").value,cal:"",prot:"",img});mDay=ld(now);inp.value="";toast("Meal saved");rMeals()}
+async function updMeal(id,k,v){const m=(await mAll()).find(x=>x.id===id);m[k]=v;await mPut(m);mTotals()}
+async function delMeal(id){if(confirm("Delete this meal?")){await mDel(id);rMeals()}}
+async function mTotals(){const t=totals((await mAll()).filter(m=>m.date===mDay)),e=$("#mtot");if(!e)return;const pct=Math.min(100,t.p/160*100);
+e.innerHTML=`<div><b>${t.p} g</b> protein <span class="sub">/ 160-180 g target</span> · <b>${t.c}</b> cal</div><div class="bar"><div style="width:${pct}%;background:${t.p>=160?"#4ade80":"#ff7a1a"}"></div></div>`}
+function shiftDay(n){const d=new Date(mDay+"T12:00:00");d.setDate(d.getDate()+n);mDay=ld(d);rMeals()}
+async function rMeals(){mDay=mDay||today();$("#title").textContent="Meals";$("#subtitle").textContent="Snap it, share it, track protein";urls.forEach(URL.revokeObjectURL);urls=[];
+const ms=(await mAll()).filter(m=>m.date===mDay),isT=mDay===today();if(view!=="meals")return;
+let h=`<div class="card"><div class="row" style="align-items:center;margin:0"><button style="flex:0 0 52px" onclick="shiftDay(-1)">‹</button><div style="text-align:center"><b>${isT?"Today":fmtDate(mDay)}</b></div><button style="flex:0 0 52px" onclick="shiftDay(1)" ${isT?"disabled":""}>›</button></div><div id="mtot" style="margin-top:10px"></div></div>`;
+if(isT)h+=`<div class="card"><div class="row" style="margin-top:0"><select id="mt">${["Breakfast","Lunch","Dinner","Snack"].map(t=>`<option ${t===defType()?"selected":""}>${t}</option>`).join("")}</select></div><input id="mn" placeholder="Note: portion, sauces, drinks (optional)" style="margin-top:8px">
+<button class="primary big" style="margin-top:10px" onclick="$('#mcam').click()">📷 Take meal photo</button><button style="width:100%;margin-top:8px" onclick="$('#mgal').click()">Choose from gallery</button>
+<input type="file" id="mcam" accept="image/*" capture="environment" style="display:none" onchange="addMeal(this)"><input type="file" id="mgal" accept="image/*" style="display:none" onchange="addMeal(this)"></div>`;
+h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><h2 style="margin:0">${ms.length} meal${ms.length==1?"":"s"}</h2>${ms.length?`<button class="primary" onclick="shareDay()">Share ${isT?"today's":"day's"} meals</button>`:""}</div>`+
+(ms.map(m=>{let u="";if(m.img){u=URL.createObjectURL(m.img);urls.push(u)}return `<div class="meal">${u?`<img src="${u}" alt="">`:""}<div class="r"><b>${esc(m.type)}</b> <span class="sub">${tStr(m.ts)}</span>${m.note?`<div class="sub">${esc(m.note)}</div>`:""}
+<div class="row" style="margin-top:6px"><input inputmode="numeric" placeholder="cal" value="${esc(m.cal)}" onchange="updMeal('${m.id}','cal',this.value)"><input inputmode="numeric" placeholder="protein g" value="${esc(m.prot)}" onchange="updMeal('${m.id}','prot',this.value)"></div>
+<div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
+$("#main").innerHTML=h;mTotals()}
 render();
 </script></body></html>

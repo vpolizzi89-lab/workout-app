@@ -176,15 +176,18 @@ h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}
 // ---- Speech-to-text for meal notes ----
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let mnDraft="",rec=null,recBase="";
 function micUI(on,msg){const b=$("#mic");if(b)b.classList.toggle("on",on);const st=$("#micst");if(st)st.textContent=msg||""}
-function micStop(){if(rec){try{rec.stop()}catch(e){}}}
-function micToggle(){if(rec){micStop();return}if(!SR)return;
- rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=true;
- recBase=(($("#mn")||{}).value||mnDraft||"").trim();let fin="";
- const put=t=>{const v=(recBase?recBase+" ":"")+t;mnDraft=v.trim()?v:recBase;const i=$("#mn");if(i)i.value=v};
- rec.onresult=e=>{let it="";for(let k=e.resultIndex;k<e.results.length;k++){const r=e.results[k];if(r.isFinal)fin+=(fin?" ":"")+r[0].transcript.trim();else it+=r[0].transcript}put((fin+(it?" "+it:"")).trim())};
- rec.onerror=e=>{const m=e.error==="not-allowed"||e.error==="service-not-allowed"?"Mic blocked. Allow microphone for this site in browser settings, or use the keyboard mic.":e.error==="no-speech"?"Didn't catch that, tap 🎤 to try again.":"Speech error ("+e.error+"). You can use the keyboard mic instead.";rec._msg=m};
- rec.onend=()=>{put(fin);const m=rec&&rec._msg;rec=null;micUI(false,m)};
- try{rec.start();micUI(true,"Listening… tap 🎤 to stop")}catch(e){rec=null;micUI(false,"Couldn't start the mic. Use the keyboard mic instead.")}}
+function micStop(){micOn=false;if(rec){try{rec.stop()}catch(e){}}else micUI(false)}
+let micOn=false;
+function micJoin(parts){let acc="";for(const t0 of parts){const t=t0.trim();if(!t)continue;const al=acc.toLowerCase(),tl=t.toLowerCase();if(!acc||tl.startsWith(al))acc=t;else if(al.endsWith(tl)||al.includes(tl))continue;else acc+=" "+t}return acc}
+function micSession(){rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=false;
+ recBase=(($("#mn")||{}).value||mnDraft||"").trim();
+ const put=t=>{const v=t?(recBase?recBase+" ":"")+t:recBase;mnDraft=v;const i=$("#mn");if(i)i.value=v};
+ rec.onresult=e=>{const fin=[],it=[];for(let k=0;k<e.results.length;k++){const r=e.results[k];(r.isFinal?fin:it).push(r[0].transcript)}const f=micJoin(fin),i=micJoin(it);let t=f;if(i){const il=i.toLowerCase(),fl=f.toLowerCase();t=!f||il.startsWith(fl)?i:fl.includes(il)?f:f+" "+i}put(t)};
+ rec.onerror=e=>{if(e.error==="no-speech"||e.error==="aborted")return;micOn=false;rec._msg=e.error==="not-allowed"||e.error==="service-not-allowed"?"Mic blocked. Allow microphone for this site in browser settings, or use the keyboard mic.":"Speech error ("+e.error+"). You can use the keyboard mic instead."};
+ rec.onend=()=>{const m=rec&&rec._msg;rec=null;if(micOn){try{micSession();return}catch(x){micOn=false}}micUI(false,m)};
+ rec.start()}
+function micToggle(){if(micOn||rec){micStop();return}if(!SR)return;micOn=true;
+ try{micSession();micUI(true,"Listening… tap 🎤 to stop")}catch(e){micOn=false;rec=null;micUI(false,"Couldn't start the mic. Use the keyboard mic instead.")}}
 // ---- Google Drive sync (Apps Script backend) ----
 const SYK="vwt_sync";let SY={};try{SY=JSON.parse(localStorage.getItem(SYK))||{}}catch(e){}
 function sySave(){localStorage.setItem(SYK,JSON.stringify(SY))}

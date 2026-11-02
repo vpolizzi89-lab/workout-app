@@ -23,6 +23,7 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#161a22;paddi
 #syncst{position:absolute;right:14px;top:16px;font-size:12px;color:#9aa3b2;max-width:45%;text-align:right}#syncst.err{color:#f87171}
 .kv{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}.kv div{background:#0f1115;border-radius:10px;padding:8px}.kv b{display:block;font-size:17px}.kv span{color:#9aa3b2;font-size:12px}.dl{color:#9aa3b2;font-size:12px}.up{color:#4ade80}.dn{color:#f87171}details summary{cursor:pointer;color:#9aa3b2;margin-top:8px}
 canvas{width:100%;height:180px;background:#0f1115;border-radius:10px}
+.mic{font-size:22px;padding:10px 0}.mic.on{background:#dc2626;color:#fff;border-color:#dc2626;animation:micp 1s infinite}@keyframes micp{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)}50%{box-shadow:0 0 0 10px rgba(220,38,38,0)}}
 </style></head><body>
 <header><div id="syncst" onclick="view='settings';render()"></div><h1 id="title">Workout</h1><div class="sub" id="subtitle"></div></header>
 <main id="main"></main>
@@ -151,7 +152,7 @@ async function shareDay(){const ms=(await mAll()).filter(m=>m.date===mDay);if(!m
 const txt=`Meals for ${fmtDate(mDay)} (${ms.length}):\n`+ms.map(m=>"- "+mealText(m).replace(/^Meal log: [^,]+, [^,]+, [^,]+, /,"")).join("\n")+(tot.c||tot.p?`\nLogged totals: ${tot.c?tot.c+" cal":""}${tot.c&&tot.p?", ":""}${tot.p?tot.p+" g protein":""}`:"");shareMeals(ms,"Today's meals",txt)}
 function totals(ms){return ms.reduce((a,m)=>({c:a.c+(+m.cal||0),p:a.p+(+m.prot||0)}),{c:0,p:0})}
 async function addMeal(inp){const f=inp.files[0];if(!f)return;toast("Saving...");const img=await compress(f);const now=new Date();
-await mPut({updatedAt:Date.now(),id:now.getTime()+"-"+Math.random().toString(36).slice(2,6),ts:now.getTime(),date:ld(now),type:$("#mt").value,note:$("#mn").value,cal:"",prot:"",img});mDay=ld(now);inp.value="";toast("Meal saved");schedSync();rMeals()}
+await mPut({updatedAt:Date.now(),id:now.getTime()+"-"+Math.random().toString(36).slice(2,6),ts:now.getTime(),date:ld(now),type:$("#mt").value,note:$("#mn").value,cal:"",prot:"",img});mDay=ld(now);inp.value="";mnDraft="";micStop();toast("Meal saved");schedSync();rMeals()}
 async function updMeal(id,k,v){const m=(await mAll()).find(x=>x.id===id);m[k]=v;await mPut(m);schedSync();mTotals()}
 async function delMeal(id){if(confirm("Delete this meal?")){await mDel(id);schedSync();rMeals()}}
 const CG=()=>+S.ctgt||2400;
@@ -164,7 +165,7 @@ function shiftDay(n){const d=new Date(mDay+"T12:00:00");d.setDate(d.getDate()+n)
 async function rMeals(){mDay=mDay||today();$("#title").textContent="Meals";$("#subtitle").textContent="Snap it, share it, track protein";urls.forEach(URL.revokeObjectURL);urls=[];
 const ms=(await mAll()).filter(m=>m.date===mDay),isT=mDay===today();if(view!=="meals")return;
 let h=`<div class="card"><div class="row" style="align-items:center;margin:0"><button style="flex:0 0 52px" onclick="shiftDay(-1)">‹</button><div style="text-align:center"><b>${isT?"Today":fmtDate(mDay)}</b></div><button style="flex:0 0 52px" onclick="shiftDay(1)" ${isT?"disabled":""}>›</button></div><div id="mtot" style="margin-top:10px"></div></div>`;
-if(isT)h+=`<div class="card"><div class="row" style="margin-top:0"><select id="mt">${["Breakfast","Lunch","Dinner","Snack"].map(t=>`<option ${t===defType()?"selected":""}>${t}</option>`).join("")}</select></div><input id="mn" placeholder="Note: portion, sauces, drinks (optional)" style="margin-top:8px">
+if(isT)h+=`<div class="card"><div class="row" style="margin-top:0"><select id="mt">${["Breakfast","Lunch","Dinner","Snack"].map(t=>`<option ${t===defType()?"selected":""}>${t}</option>`).join("")}</select></div><div style="display:flex;gap:8px;margin-top:8px;align-items:center"><input id="mn" placeholder="Note: portion, sauces, drinks (optional)" value="${esc(mnDraft)}" oninput="mnDraft=this.value" style="flex:1"><button id="mic" type="button" class="mic" style="flex:0 0 52px;${SR?"":"display:none"}" onclick="micToggle()" aria-label="Speak meal description">🎤</button></div>${SR?"":`<div class="sub" style="margin-top:4px">Tip: use your keyboard's mic key to dictate.</div>`}<div id="micst" class="sub" style="margin-top:4px"></div>
 <button class="primary big" style="margin-top:10px" onclick="$('#mcam').click()">📷 Take meal photo</button><button style="width:100%;margin-top:8px" onclick="$('#mgal').click()">Choose from gallery</button>
 <input type="file" id="mcam" accept="image/*" capture="environment" style="display:none" onchange="addMeal(this)"><input type="file" id="mgal" accept="image/*" style="display:none" onchange="addMeal(this)"></div>`;
 h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><h2 style="margin:0">${ms.length} meal${ms.length==1?"":"s"}</h2>${ms.length?`<button class="primary" onclick="shareDay()">Share ${isT?"today's":"day's"} meals</button>`:""}</div>`+
@@ -172,6 +173,18 @@ h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><
 <div class="row" style="margin-top:6px"><input inputmode="numeric" placeholder="cal" value="${esc(m.cal)}" onchange="updMeal('${m.id}','cal',this.value)"><input inputmode="numeric" placeholder="protein g" value="${esc(m.prot)}" onchange="updMeal('${m.id}','prot',this.value)"></div>
 <div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
 h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}
+// ---- Speech-to-text for meal notes ----
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let mnDraft="",rec=null,recBase="";
+function micUI(on,msg){const b=$("#mic");if(b)b.classList.toggle("on",on);const st=$("#micst");if(st)st.textContent=msg||""}
+function micStop(){if(rec){try{rec.stop()}catch(e){}}}
+function micToggle(){if(rec){micStop();return}if(!SR)return;
+ rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=true;
+ recBase=(($("#mn")||{}).value||mnDraft||"").trim();let fin="";
+ const put=t=>{const v=(recBase?recBase+" ":"")+t;mnDraft=v.trim()?v:recBase;const i=$("#mn");if(i)i.value=v};
+ rec.onresult=e=>{let it="";for(let k=e.resultIndex;k<e.results.length;k++){const r=e.results[k];if(r.isFinal)fin+=(fin?" ":"")+r[0].transcript.trim();else it+=r[0].transcript}put((fin+(it?" "+it:"")).trim())};
+ rec.onerror=e=>{const m=e.error==="not-allowed"||e.error==="service-not-allowed"?"Mic blocked. Allow microphone for this site in browser settings, or use the keyboard mic.":e.error==="no-speech"?"Didn't catch that, tap 🎤 to try again.":"Speech error ("+e.error+"). You can use the keyboard mic instead.";rec._msg=m};
+ rec.onend=()=>{put(fin);const m=rec&&rec._msg;rec=null;micUI(false,m)};
+ try{rec.start();micUI(true,"Listening… tap 🎤 to stop")}catch(e){rec=null;micUI(false,"Couldn't start the mic. Use the keyboard mic instead.")}}
 // ---- Google Drive sync (Apps Script backend) ----
 const SYK="vwt_sync";let SY={};try{SY=JSON.parse(localStorage.getItem(SYK))||{}}catch(e){}
 function sySave(){localStorage.setItem(SYK,JSON.stringify(SY))}

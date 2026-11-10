@@ -12,6 +12,7 @@ button.on,.primary{background:#ff7a1a;color:#111;font-weight:700}
 .sub{color:#9aa3b2;font-size:13px}.sug{color:#4ade80;font-size:14px;margin:4px 0}
 .set{display:grid;grid-template-columns:28px 1fr 1fr 64px;gap:8px;align-items:center;margin-top:8px}
 input,textarea,select{width:100%;background:#0f1115;color:#fff;border:1px solid #333b4a;border-radius:10px;padding:12px;font-size:17px}
+input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;flex:0 0 auto;accent-color:#ff7a1a}
 .set button.done{background:#16a34a;color:#fff}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#161a22;padding:8px;gap:6px}nav button{flex:1;padding:10px 2px;font-size:13px}
 .meal{display:flex;gap:10px;margin-top:10px;border-top:1px solid #2a3140;padding-top:10px}.meal img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:0 0 auto}.meal .r{flex:1;min-width:0}.meal input{padding:8px;font-size:15px}
@@ -153,6 +154,15 @@ async function shareMeal(id){const m=(await mAll()).find(x=>x.id===id);shareMeal
 async function shareDay(){const ms=(await mAll()).filter(m=>m.date===mDay);if(!ms.length)return toast("No meals");const tot=totals(ms);
 const txt=`Meals for ${fmtDate(mDay)} (${ms.length}):\n`+ms.map(m=>"- "+mealText(m).replace(/^Meal log: [^,]+, [^,]+, [^,]+, /,"")).join("\n")+(tot.c||tot.p?`\nLogged totals: ${tot.c?tot.c+" cal":""}${tot.c&&tot.p?", ":""}${tot.p?tot.p+" g protein":""}`:"");shareMeals(ms,"Today's meals",txt)}
 function totals(ms){return ms.reduce((a,m)=>({c:a.c+(+m.cal||0),p:a.p+(+m.prot||0)}),{c:0,p:0})}
+const SUPS=[
+{id:"shake",label:"Protein shake (2 scoops + water)",cal:270,prot:60,detail:"270 cal · 60 g protein",note:"Protein shake (2 scoops + water): Body Fortress Super Advanced Isolate, 2 scoops (76 g). 270 cal, 60 g protein, 1.5 g fat, 5 g carbs.",re:/protein shake|body fortress|2 scoops \+ water/i},
+{id:"creatine",label:"Creatine (1 scoop)",cal:5,prot:0,detail:"5 cal · 0 g protein",note:"Creatine (1 scoop): PMD CG5 Creatine + Glutamine, 1 scoop (5.2 g). 5 cal, 0 g protein.",re:/\bcreatine\b/i}];
+function supId(s,d){return "supp-"+s.id+"-"+d}
+function isSupMeal(m,s){return m.supp===s.id||String(m.id||"").indexOf("supp-"+s.id+"-")===0||s.re.test(m.note||"")||s.re.test(m.type||"")}
+function findSup(ms,s){return (ms||[]).find(m=>isSupMeal(m,s))}
+async function togSup(id){const s=SUPS.find(x=>x.id===id);if(!s||!mDay)return;const ms=(await mAll()).filter(m=>m.date===mDay),ex=findSup(ms,s);
+ if(ex){const ours=ex.supp===s.id||String(ex.id||"").indexOf("supp-"+s.id+"-")===0;if(!ours&&!confirm("Remove the already logged "+s.label+" meal for this day?")){rMeals();return}await mDel(ex.id);schedSync();rMeals();return}
+ const now=Date.now();await mPut({updatedAt:now,id:supId(s,mDay),ts:now,date:mDay,type:"Snack",note:s.note,cal:s.cal,prot:s.prot,supp:s.id});schedSync();rMeals()}
 async function addMeal(inp){const f=inp.files[0];if(!f)return;toast("Saving...");const img=await compress(f);const now=new Date();
 await mPut({updatedAt:Date.now(),id:now.getTime()+"-"+Math.random().toString(36).slice(2,6),ts:now.getTime(),date:ld(now),type:$("#mt").value,note:$("#mn").value,cal:"",prot:"",img});mDay=ld(now);inp.value="";mnDraft="";micStop();toast("Meal saved");schedSync();rMeals()}
 async function updMeal(id,k,v){const m=(await mAll()).find(x=>x.id===id);m[k]=v;await mPut(m);schedSync();mTotals()}
@@ -174,6 +184,8 @@ h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><
 (ms.map(m=>{let u="";if(m.img){u=URL.createObjectURL(m.img);urls.push(u)}return `<div class="meal">${u?`<img src="${u}" alt="">`:""}<div class="r"><b>${esc(m.type)}</b> <span class="sub">${tStr(m.ts)}</span>${m.note?`<div class="sub">${esc(m.note)}</div>`:""}${(m.img||m.photoId)&&!m.cal&&!m.prot?`<div class="sub" style="color:#ff7a1a">⏳ Grok Bot is estimating…</div>`:""}
 <div class="row" style="margin-top:6px"><input inputmode="numeric" placeholder="cal" value="${esc(m.cal)}" onchange="updMeal('${m.id}','cal',this.value)"><input inputmode="numeric" placeholder="protein g" value="${esc(m.prot)}" onchange="updMeal('${m.id}','prot',this.value)"></div>
 <div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
+h+=`<div class="card"><h2>Daily supplements</h2><div class="sub">Check to add these to the day's totals. Uncheck to remove.</div>`+
+SUPS.map(s=>{const on=!!findSup(ms,s);return `<label style="display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:8px 0;min-height:44px;cursor:pointer"><input type="checkbox" ${on?"checked":""} onchange="togSup('${s.id}')"><span><b>${esc(s.label)}</b><div class="sub">${esc(s.detail)}</div></span></label>`}).join("")+"</div>";
 h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}
 // ---- Speech-to-text for meal notes ----
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let mnDraft="",rec=null,recBase="";

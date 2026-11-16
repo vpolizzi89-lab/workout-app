@@ -172,6 +172,13 @@ function barMeals(ms,b){return (ms||[]).filter(m=>isBarMeal(m,b))}
 async function addBar(id){const b=BARS.find(x=>x.id===id);if(!b||!mDay)return;const now=Date.now();
  await mPut({updatedAt:now,id:"supp-"+b.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:b.note,cal:b.cal,prot:b.prot,supp:b.id});toast("Bar logged");schedSync();rMeals()}
 async function rmBar(id){const b=BARS.find(x=>x.id===id);if(!b||!mDay)return;const list=barMeals((await mAll()).filter(m=>m.date===mDay),b);if(!list.length)return;await mDel(list[list.length-1].id);schedSync();rMeals()}
+const EGG={id:"eggs",cal:78,prot:6};
+function isEggMeal(m){return m.supp===EGG.id||String(m.id||"").indexOf("supp-"+EGG.id+"-")===0}
+function eggMeals(ms){return (ms||[]).filter(isEggMeal)}
+function eggN(m){return +m.eggs||Math.max(1,Math.round((+m.cal||EGG.cal)/EGG.cal))}
+async function addEggs(n){n=+n;if(!(n>=1&&n<=4)||!mDay)return;const now=Date.now(),note=n===1?"1 hard-boiled egg":n+" hard-boiled eggs";
+ await mPut({updatedAt:now,id:"supp-"+EGG.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:note,cal:n*EGG.cal,prot:n*EGG.prot,supp:EGG.id,eggs:n});toast(note[0].toUpperCase()+note.slice(1)+" logged");schedSync();rMeals()}
+async function rmEggs(){if(!mDay)return;const list=eggMeals((await mAll()).filter(m=>m.date===mDay));if(!list.length)return;await mDel(list[list.length-1].id);schedSync();rMeals()}
 async function addMeal(inp){const f=inp.files[0];if(!f)return;toast("Saving...");const img=await compress(f);const now=new Date();
 await mPut({updatedAt:Date.now(),id:now.getTime()+"-"+Math.random().toString(36).slice(2,6),ts:now.getTime(),date:ld(now),type:$("#mt").value,note:$("#mn").value,cal:"",prot:"",img});mDay=ld(now);inp.value="";mnDraft="";micStop();toast("Meal saved");schedSync();rMeals()}
 async function updMeal(id,k,v){const m=(await mAll()).find(x=>x.id===id);m[k]=v;await mPut(m);schedSync();mTotals()}
@@ -197,6 +204,10 @@ h+=`<div class="card"><h2>Daily supplements</h2><div class="sub">Check to add th
 SUPS.map(s=>{const on=!!findSup(ms,s);return `<label style="display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:8px 0;min-height:44px;cursor:pointer"><input type="checkbox" ${on?"checked":""} onchange="togSup('${s.id}')"><span><b>${esc(s.label)}</b><div class="sub">${esc(s.detail)}</div></span></label>`}).join("")+"</div>";
 h+=`<div class="card"><h2>Protein bars</h2><div class="sub">Tap + to log a bar. Tap − to remove one.</div>`+
 BARS.map(b=>{const n=barMeals(ms,b).length;return `<div style="display:flex;gap:10px;align-items:center;margin-top:10px;padding:8px 0;min-height:44px"><span style="flex:1;min-width:0"><b>${esc(b.label)}</b><div class="sub">${esc(b.detail)}</div></span><button type="button" style="flex:0 0 44px;margin:0" ${n?"":"disabled"} onclick="rmBar('${b.id}')" aria-label="Remove one ${esc(b.label)}">−</button><b style="min-width:1.4em;text-align:center">${n}</b><button type="button" class="primary" style="flex:0 0 44px;margin:0" onclick="addBar('${b.id}')" aria-label="Add one ${esc(b.label)}">+</button></div>`}).join("")+"</div>";
+const eggs=eggMeals(ms),en=eggs.reduce((a,m)=>a+eggN(m),0);
+h+=`<div class="card"><h2>Hard-boiled eggs</h2><div class="sub">78 cal · 6 g protein each. Tap 1–4 to log that many.</div><div style="display:flex;gap:8px;align-items:center;margin-top:10px;min-height:44px">`+
+[1,2,3,4].map(n=>`<button type="button" class="primary" style="flex:1;margin:0" onclick="addEggs(${n})" aria-label="Log ${n} hard-boiled egg${n>1?"s":""}">${n}</button>`).join("")+
+`<button type="button" style="flex:0 0 44px;margin:0" ${en?"":"disabled"} onclick="rmEggs()" aria-label="Remove last egg entry">−</button>`+(en?`<b style="flex:0 0 auto;white-space:nowrap">${en} egg${en==1?"":"s"}</b>`:"")+`</div></div>`;
 h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}
 // ---- Speech-to-text for meal notes ----
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let mnDraft="",rec=null,recBase="";

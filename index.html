@@ -134,7 +134,7 @@ async function exp(t){const a=document.createElement("a");a.href=URL.createObjec
 async function share(){const f=new File([await blob("json")],"workout-log-"+today()+".json",{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:"Workout log"});else exp("json")}
 function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(async t=>{const d=JSON.parse(t);if(!d.sessions||!d.plan)throw 0;const ml=d.meals||[];delete d.meals;S=Object.assign({cardio:[],body:[],daily:[],draft:{}},d);save();for(const m of ml){m.img=m.img?await (await fetch(m.img)).blob():null;await mPut(m)}schedSync();alert("Imported "+S.sessions.length+" workouts");render()}).catch(()=>alert("Not a valid backup file"))}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
-if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
+if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update());
 // ---- Meals (IndexedDB) ----
 let dbp;function db(){return dbp||(dbp=new Promise((ok,no)=>{const r=indexedDB.open("vwt_meals",1);r.onupgradeneeded=()=>r.result.createObjectStore("meals",{keyPath:"id"});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
 async function tx(mode,fn){const d=await db();return new Promise((ok,no)=>{const t=d.transaction("meals",mode),st=t.objectStore("meals");const r=fn(st);t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>no(t.error)})}

@@ -157,21 +157,17 @@ function totals(ms){return ms.reduce((a,m)=>({c:a.c+(+m.cal||0),p:a.p+(+m.prot||
 const SUPS=[
 {id:"shake",label:"Protein shake (2 scoops + water)",cal:270,prot:60,detail:"270 cal · 60 g protein",note:"Protein shake (2 scoops + water): Body Fortress Super Advanced Isolate, 2 scoops (76 g). 270 cal, 60 g protein, 1.5 g fat, 5 g carbs.",re:/protein shake|body fortress|2 scoops \+ water/i},
 {id:"creatine",label:"Creatine (1 scoop)",cal:5,prot:0,detail:"5 cal · 0 g protein",note:"Creatine (1 scoop): PMD CG5 Creatine + Glutamine, 1 scoop (5.2 g). 5 cal, 0 g protein.",re:/\bcreatine\b/i}];
-function supId(s,d){return "supp-"+s.id+"-"+d}
 function isSupRec(r){return r&&r.type==="meals"&&((r.data&&r.data.supp)||/^supp-/.test(String(r.id||"")))}
-function isSupMeal(m,s){return m.supp===s.id||String(m.id||"").indexOf("supp-"+s.id+"-")===0||s.re.test(m.note||"")||s.re.test(m.type||"")}
-function findSup(ms,s){return (ms||[]).find(m=>isSupMeal(m,s))}
-async function togSup(id){const s=SUPS.find(x=>x.id===id);if(!s||!mDay)return;const ms=(await mAll()).filter(m=>m.date===mDay),ex=findSup(ms,s);
- if(ex){const ours=ex.supp===s.id||String(ex.id||"").indexOf("supp-"+s.id+"-")===0;if(!ours&&!confirm("Remove the already logged "+s.label+" meal for this day?")){rMeals();return}await mDel(ex.id);schedSync();rMeals();return}
- const now=Date.now();await mPut({updatedAt:now,id:supId(s,mDay),ts:now,date:mDay,type:"Snack",note:s.note,cal:s.cal,prot:s.prot,supp:s.id});schedSync();rMeals()}
 const BARS=[
 {id:"bar-ccd",label:"FitCrunch Cookie Dough",cal:210,prot:16,detail:"210 cal · 16 g protein",note:"FitCrunch Chocolate Chip Cookie Dough bar"},
 {id:"bar-cpb",label:"FitCrunch Chocolate Peanut Butter",cal:190,prot:16,detail:"190 cal · 16 g protein",note:"FitCrunch Chocolate Peanut Butter bar"}];
-function isBarMeal(m,b){return m.supp===b.id||String(m.id||"").indexOf("supp-"+b.id+"-")===0}
-function barMeals(ms,b){return (ms||[]).filter(m=>isBarMeal(m,b))}
-async function addBar(id){const b=BARS.find(x=>x.id===id);if(!b||!mDay)return;const now=Date.now();
- await mPut({updatedAt:now,id:"supp-"+b.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:b.note,cal:b.cal,prot:b.prot,supp:b.id});toast("Bar logged");schedSync();rMeals()}
-async function rmBar(id){const b=BARS.find(x=>x.id===id);if(!b||!mDay)return;const list=barMeals((await mAll()).filter(m=>m.date===mDay),b);if(!list.length)return;await mDel(list[list.length-1].id);schedSync();rMeals()}
+const QUICK=SUPS.concat(BARS);
+function isQuickMeal(m,s){return m.supp===s.id||String(m.id||"").indexOf("supp-"+s.id+"-")===0}
+function quickMeals(ms,s){return (ms||[]).filter(m=>isQuickMeal(m,s))}
+async function addQuick(id){const s=QUICK.find(x=>x.id===id);if(!s||!mDay)return;const now=Date.now();
+ await mPut({updatedAt:now,id:"supp-"+s.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:s.note,cal:s.cal,prot:s.prot,supp:s.id});toast("Logged");schedSync();rMeals()}
+async function rmQuick(id){const s=QUICK.find(x=>x.id===id);if(!s||!mDay)return;const list=quickMeals((await mAll()).filter(m=>m.date===mDay),s);if(!list.length)return;await mDel(list[list.length-1].id);schedSync();rMeals()}
+function qRow(s,n){return `<div style="display:flex;gap:10px;align-items:center;margin-top:6px;padding:4px 0;min-height:44px"><span style="flex:1;min-width:0"><b>${esc(s.label)}</b><div class="sub">${esc(s.detail)}</div></span><button type="button" style="flex:0 0 44px;margin:0" ${n?"":"disabled"} onclick="rmQuick('${s.id}')" aria-label="Remove one ${esc(s.label)}">−</button><b style="min-width:1.4em;text-align:center">${n}</b><button type="button" class="primary" style="flex:0 0 44px;margin:0" onclick="addQuick('${s.id}')" aria-label="Add one ${esc(s.label)}">+</button></div>`}
 const EGG={id:"eggs",cal:78,prot:6};
 function isEggMeal(m){return m.supp===EGG.id||String(m.id||"").indexOf("supp-"+EGG.id+"-")===0}
 function eggMeals(ms){return (ms||[]).filter(isEggMeal)}
@@ -200,12 +196,10 @@ h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><
 (ms.map(m=>{let u="";if(m.img){u=URL.createObjectURL(m.img);urls.push(u)}return `<div class="meal">${u?`<img src="${u}" alt="">`:""}<div class="r"><b>${esc(m.type)}</b> <span class="sub">${tStr(m.ts)}</span>${m.note?`<div class="sub">${esc(m.note)}</div>`:""}${(m.img||m.photoId)&&!m.cal&&!m.prot?`<div class="sub" style="color:#ff7a1a">⏳ Grok Bot is estimating…</div>`:""}
 <div class="row" style="margin-top:6px"><input inputmode="numeric" placeholder="cal" value="${esc(m.cal)}" onchange="updMeal('${m.id}','cal',this.value)"><input inputmode="numeric" placeholder="protein g" value="${esc(m.prot)}" onchange="updMeal('${m.id}','prot',this.value)"></div>
 <div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
-h+=`<div class="card"><h2>Daily supplements</h2><div class="sub">Check to add these to the day's totals. Uncheck to remove.</div>`+
-SUPS.map(s=>{const on=!!findSup(ms,s);return `<label style="display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:8px 0;min-height:44px;cursor:pointer"><input type="checkbox" ${on?"checked":""} onchange="togSup('${s.id}')"><span><b>${esc(s.label)}</b><div class="sub">${esc(s.detail)}</div></span></label>`}).join("")+"</div>";
-h+=`<div class="card"><h2>Protein bars</h2><div class="sub">Tap + to log a bar. Tap − to remove one.</div>`+
-BARS.map(b=>{const n=barMeals(ms,b).length;return `<div style="display:flex;gap:10px;align-items:center;margin-top:10px;padding:8px 0;min-height:44px"><span style="flex:1;min-width:0"><b>${esc(b.label)}</b><div class="sub">${esc(b.detail)}</div></span><button type="button" style="flex:0 0 44px;margin:0" ${n?"":"disabled"} onclick="rmBar('${b.id}')" aria-label="Remove one ${esc(b.label)}">−</button><b style="min-width:1.4em;text-align:center">${n}</b><button type="button" class="primary" style="flex:0 0 44px;margin:0" onclick="addBar('${b.id}')" aria-label="Add one ${esc(b.label)}">+</button></div>`}).join("")+"</div>";
 const eggs=eggMeals(ms),en=eggs.reduce((a,m)=>a+eggN(m),0);
-h+=`<div class="card"><h2>Hard-boiled eggs</h2><div class="sub">78 cal · 6 g protein each. Tap 1–4 to log that many.</div><div style="display:flex;gap:8px;align-items:center;margin-top:10px;min-height:44px">`+
+h+=`<div class="card"><h2>Quick add</h2><div class="sub">Tap + to log one, or 1–4 for eggs. Tap − to remove the last one.</div>`+
+QUICK.map(s=>qRow(s,quickMeals(ms,s).length)).join("")+
+`<div style="margin-top:10px"><b>Hard-boiled eggs</b><div class="sub">78 cal · 6 g protein each</div></div><div style="display:flex;gap:8px;align-items:center;margin-top:8px;min-height:44px">`+
 [1,2,3,4].map(n=>`<button type="button" class="primary" style="flex:1;margin:0" onclick="addEggs(${n})" aria-label="Log ${n} hard-boiled egg${n>1?"s":""}">${n}</button>`).join("")+
 `<button type="button" style="flex:0 0 44px;margin:0" ${en?"":"disabled"} onclick="rmEggs()" aria-label="Remove last egg entry">−</button>`+(en?`<b style="flex:0 0 auto;white-space:nowrap">${en} egg${en==1?"":"s"}</b>`:"")+`</div></div>`;
 h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}

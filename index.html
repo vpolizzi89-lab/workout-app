@@ -197,7 +197,7 @@ h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><
 <div class="row" style="margin-top:6px"><input inputmode="numeric" placeholder="cal" value="${esc(m.cal)}" onchange="updMeal('${m.id}','cal',this.value)"><input inputmode="numeric" placeholder="protein g" value="${esc(m.prot)}" onchange="updMeal('${m.id}','prot',this.value)"></div>
 <div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
 const eggs=eggMeals(ms),en=eggs.reduce((a,m)=>a+eggN(m),0);
-h+=`<div class="card"><h2>Quick add</h2><div class="sub">Tap + to log one, or 1–4 for eggs. Tap − to remove the last one.</div>`+
+h+=`<div class="card"><h2>Regulars</h2><div class="sub">Things you have often, tap to log.</div>`+
 QUICK.map(s=>qRow(s,quickMeals(ms,s).length)).join("")+
 `<div style="margin-top:10px"><b>Hard-boiled eggs</b><div class="sub">78 cal · 6 g protein each</div></div><div style="display:flex;gap:8px;align-items:center;margin-top:8px;min-height:44px">`+
 [1,2,3,4].map(n=>`<button type="button" class="primary" style="flex:1;margin:0" onclick="addEggs(${n})" aria-label="Log ${n} hard-boiled egg${n>1?"s":""}">${n}</button>`).join("")+

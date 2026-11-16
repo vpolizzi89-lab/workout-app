@@ -158,6 +158,7 @@ const SUPS=[
 {id:"shake",label:"Protein shake (2 scoops + water)",cal:270,prot:60,detail:"270 cal · 60 g protein",note:"Protein shake (2 scoops + water): Body Fortress Super Advanced Isolate, 2 scoops (76 g). 270 cal, 60 g protein, 1.5 g fat, 5 g carbs.",re:/protein shake|body fortress|2 scoops \+ water/i},
 {id:"creatine",label:"Creatine (1 scoop)",cal:5,prot:0,detail:"5 cal · 0 g protein",note:"Creatine (1 scoop): PMD CG5 Creatine + Glutamine, 1 scoop (5.2 g). 5 cal, 0 g protein.",re:/\bcreatine\b/i}];
 function supId(s,d){return "supp-"+s.id+"-"+d}
+function isSupRec(r){return r&&r.type==="meals"&&!r.deleted&&((r.data&&r.data.supp)||/^supp-/.test(String(r.id||"")))}
 function isSupMeal(m,s){return m.supp===s.id||String(m.id||"").indexOf("supp-"+s.id+"-")===0||s.re.test(m.note||"")||s.re.test(m.type||"")}
 function findSup(ms,s){return (ms||[]).find(m=>isSupMeal(m,s))}
 async function togSup(id){const s=SUPS.find(x=>x.id===id);if(!s||!mDay)return;const ms=(await mAll()).filter(m=>m.date===mDay),ex=findSup(ms,s);
@@ -238,10 +239,11 @@ async function doSync(manual){remoteChanged=false;
    if(!l){recs.push({type:t,id,updatedAt:SY.dirty[k],deleted:true});continue}
    if(t==="meals"&&l.rec.img&&!l.data.photoId){const up=await api({action:"uploadPhoto",mealId:id,date:l.data.date,base64:await b2d(l.rec.img)});l.rec.photoId=up.fileId;await mPut(l.rec);l.data.photoId=up.fileId}
    recs.push({type:t,id,updatedAt:SY.dirty[k],data:l.data})}
-  if(recs.length){const ur=await api({action:"upsert",records:recs});
-   for(const x of ur.results){const k=x.type+":"+x.id;const sent=recs.find(r=>r.type===x.type&&r.id===x.id);
-    if(x.status==="ok"){if(sent.deleted)delete SY.sh[k];else SY.sh[k]=JSON.stringify(sent.data);SY.ut[k]=sent.updatedAt;if(SY.dirty[k]===sent.updatedAt)delete SY.dirty[k]}
-    else if(x.status==="stale"){delete SY.dirty[k];await applyRemote(x.record,await localRecs())}}}
+  if(recs.length){const quiet=recs.filter(isSupRec),chunks=[[recs.filter(r=>!isSupRec(r)),"app"],[quiet,"bot"]];
+   for(const [chunk,src] of chunks){if(!chunk.length)continue;const ur=await api({action:"upsert",source:src,records:chunk});
+    for(const x of ur.results){const k=x.type+":"+x.id;const sent=chunk.find(r=>r.type===x.type&&r.id===x.id);
+     if(x.status==="ok"){if(sent.deleted)delete SY.sh[k];else SY.sh[k]=JSON.stringify(sent.data);SY.ut[k]=sent.updatedAt;if(SY.dirty[k]===sent.updatedAt)delete SY.dirty[k]}
+     else if(x.status==="stale"){delete SY.dirty[k];await applyRemote(x.record,await localRecs())}}}}
   SY.since=pr.now;SY.last=Date.now();SY.err=null;sySave();persist();
   await fetchPhotos();clearTimeout(retryT);
  }catch(e){SY.err=e.message||String(e);sySave();clearTimeout(retryT);retryT=setTimeout(()=>sync(),navigator.onLine?30000:60000)}

@@ -161,20 +161,16 @@ function isSupRec(r){return r&&r.type==="meals"&&((r.data&&r.data.supp)||/^supp-
 const BARS=[
 {id:"bar-ccd",label:"FitCrunch Cookie Dough",cal:210,prot:16,detail:"210 cal · 16 g protein",note:"FitCrunch Chocolate Chip Cookie Dough bar"},
 {id:"bar-cpb",label:"FitCrunch Chocolate Peanut Butter",cal:190,prot:16,detail:"190 cal · 16 g protein",note:"FitCrunch Chocolate Peanut Butter bar"}];
-const QUICK=SUPS.concat(BARS);
+const EGG={id:"eggs",label:"Hard-boiled eggs",cal:78,prot:6,detail:"78 cal · 6 g protein",note:"1 hard-boiled egg"};
+const QUICK=SUPS.concat(BARS,[EGG]);
 function isQuickMeal(m,s){return m.supp===s.id||String(m.id||"").indexOf("supp-"+s.id+"-")===0}
 function quickMeals(ms,s){return (ms||[]).filter(m=>isQuickMeal(m,s))}
-async function addQuick(id){const s=QUICK.find(x=>x.id===id);if(!s||!mDay)return;const now=Date.now();
- await mPut({updatedAt:now,id:"supp-"+s.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:s.note,cal:s.cal,prot:s.prot,supp:s.id});toast("Logged");schedSync();rMeals()}
+function eggN(m){return +m.eggs||Math.max(1,Math.round((+m.cal||EGG.cal)/EGG.cal))}
+function quickCount(ms,s){const list=quickMeals(ms,s);return s.id===EGG.id?list.reduce((a,m)=>a+eggN(m),0):list.length}
+async function addQuick(id){const s=QUICK.find(x=>x.id===id);if(!s||!mDay)return;const now=Date.now(),rec={updatedAt:now,id:"supp-"+s.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:s.note,cal:s.cal,prot:s.prot,supp:s.id};if(s.id===EGG.id)rec.eggs=1;
+ await mPut(rec);toast("Logged");schedSync();rMeals()}
 async function rmQuick(id){const s=QUICK.find(x=>x.id===id);if(!s||!mDay)return;const list=quickMeals((await mAll()).filter(m=>m.date===mDay),s);if(!list.length)return;await mDel(list[list.length-1].id);schedSync();rMeals()}
 function qRow(s,n){return `<div style="display:flex;gap:10px;align-items:center;margin-top:6px;padding:4px 0;min-height:44px"><span style="flex:1;min-width:0"><b>${esc(s.label)}</b><div class="sub">${esc(s.detail)}</div></span><button type="button" style="flex:0 0 44px;margin:0" ${n?"":"disabled"} onclick="rmQuick('${s.id}')" aria-label="Remove one ${esc(s.label)}">−</button><b style="min-width:1.4em;text-align:center">${n}</b><button type="button" class="primary" style="flex:0 0 44px;margin:0" onclick="addQuick('${s.id}')" aria-label="Add one ${esc(s.label)}">+</button></div>`}
-const EGG={id:"eggs",cal:78,prot:6};
-function isEggMeal(m){return m.supp===EGG.id||String(m.id||"").indexOf("supp-"+EGG.id+"-")===0}
-function eggMeals(ms){return (ms||[]).filter(isEggMeal)}
-function eggN(m){return +m.eggs||Math.max(1,Math.round((+m.cal||EGG.cal)/EGG.cal))}
-async function addEggs(n){n=+n;if(!(n>=1&&n<=4)||!mDay)return;const now=Date.now(),note=n===1?"1 hard-boiled egg":n+" hard-boiled eggs";
- await mPut({updatedAt:now,id:"supp-"+EGG.id+"-"+now.toString(36)+Math.random().toString(36).slice(2,6),ts:now,date:mDay,type:"Snack",note:note,cal:n*EGG.cal,prot:n*EGG.prot,supp:EGG.id,eggs:n});toast(note[0].toUpperCase()+note.slice(1)+" logged");schedSync();rMeals()}
-async function rmEggs(){if(!mDay)return;const list=eggMeals((await mAll()).filter(m=>m.date===mDay));if(!list.length)return;await mDel(list[list.length-1].id);schedSync();rMeals()}
 async function addMeal(inp){const f=inp.files[0];if(!f)return;toast("Saving...");const img=await compress(f);const now=new Date();
 await mPut({updatedAt:Date.now(),id:now.getTime()+"-"+Math.random().toString(36).slice(2,6),ts:now.getTime(),date:ld(now),type:$("#mt").value,note:$("#mn").value,cal:"",prot:"",img});mDay=ld(now);inp.value="";mnDraft="";micStop();toast("Meal saved");schedSync();rMeals()}
 async function updMeal(id,k,v){const m=(await mAll()).find(x=>x.id===id);m[k]=v;await mPut(m);schedSync();mTotals()}
@@ -196,12 +192,8 @@ h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><
 (ms.map(m=>{let u="";if(m.img){u=URL.createObjectURL(m.img);urls.push(u)}return `<div class="meal">${u?`<img src="${u}" alt="">`:""}<div class="r"><b>${esc(m.type)}</b> <span class="sub">${tStr(m.ts)}</span>${m.note?`<div class="sub">${esc(m.note)}</div>`:""}${(m.img||m.photoId)&&!m.cal&&!m.prot?`<div class="sub" style="color:#ff7a1a">⏳ Grok Bot is estimating…</div>`:""}
 <div class="row" style="margin-top:6px"><input inputmode="numeric" placeholder="cal" value="${esc(m.cal)}" onchange="updMeal('${m.id}','cal',this.value)"><input inputmode="numeric" placeholder="protein g" value="${esc(m.prot)}" onchange="updMeal('${m.id}','prot',this.value)"></div>
 <div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
-const eggs=eggMeals(ms),en=eggs.reduce((a,m)=>a+eggN(m),0);
 h+=`<div class="card"><h2>Regulars</h2><div class="sub">Things you have often, tap to log.</div>`+
-QUICK.map(s=>qRow(s,quickMeals(ms,s).length)).join("")+
-`<div style="margin-top:10px"><b>Hard-boiled eggs</b><div class="sub">78 cal · 6 g protein each</div></div><div style="display:flex;gap:8px;align-items:center;margin-top:8px;min-height:44px">`+
-[1,2,3,4].map(n=>`<button type="button" class="primary" style="flex:1;margin:0" onclick="addEggs(${n})" aria-label="Log ${n} hard-boiled egg${n>1?"s":""}">${n}</button>`).join("")+
-`<button type="button" style="flex:0 0 44px;margin:0" ${en?"":"disabled"} onclick="rmEggs()" aria-label="Remove last egg entry">−</button>`+(en?`<b style="flex:0 0 auto;white-space:nowrap">${en} egg${en==1?"":"s"}</b>`:"")+`</div></div>`;
+QUICK.map(s=>qRow(s,quickCount(ms,s))).join("")+"</div>";
 h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}
 // ---- Speech-to-text for meal notes ----
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let mnDraft="",rec=null,recBase="";

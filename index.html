@@ -158,6 +158,8 @@ const SUPS=[
 {id:"shake",label:"Protein shake (2 scoops + water)",cal:270,prot:60,detail:"270 cal · 60 g protein",note:"Protein shake (2 scoops + water): Body Fortress Super Advanced Isolate, 2 scoops (76 g). 270 cal, 60 g protein, 1.5 g fat, 5 g carbs.",re:/protein shake|body fortress|2 scoops \+ water/i},
 {id:"creatine",label:"Creatine (1 scoop)",cal:5,prot:0,detail:"5 cal · 0 g protein",note:"Creatine (1 scoop): PMD CG5 Creatine + Glutamine, 1 scoop (5.2 g). 5 cal, 0 g protein.",re:/\bcreatine\b/i}];
 function isSupRec(r){return r&&r.type==="meals"&&((r.data&&r.data.supp)||/^supp-/.test(String(r.id||"")))}
+function mealFilled(v){return v!=null&&String(v).trim()!==""}
+function keepMealMacros(dst,src){if(!dst||!src)return false;let ch=false;if(!mealFilled(dst.cal)&&mealFilled(src.cal)){dst.cal=src.cal;ch=true}if(!mealFilled(dst.prot)&&mealFilled(src.prot)){dst.prot=src.prot;ch=true}return ch}
 const BARS=[
 {id:"bar-ccd",label:"FitCrunch Cookie Dough",cal:210,prot:16,detail:"210 cal · 16 g protein",note:"FitCrunch Chocolate Chip Cookie Dough bar"},
 {id:"bar-cpb",label:"FitCrunch Chocolate Peanut Butter",cal:190,prot:16,detail:"190 cal · 16 g protein",note:"FitCrunch Chocolate Peanut Butter bar"}];
@@ -179,8 +181,7 @@ const CG=()=>+S.ctgt||2400;
 const PT=()=>{const t=S.ptgt||{};return{lo:+t.lo||160,hi:+t.hi||180}};
 async function mTotals(){const all=await mAll(),day=all.filter(m=>m.date===mDay),t=totals(day),e=$("#mtot");if(!e)return;const{lo,hi}=PT(),pct=Math.min(100,t.p/lo*100),est=day.filter(m=>(m.img||m.photoId)&&!m.cal&&!m.prot).length;
 e.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:baseline"><div><b style="font-size:22px">${t.p} g</b> protein</div><div><b style="font-size:22px">${t.c}</b> cal</div></div><div class="bar"><div style="width:${pct}%;background:${t.p>=lo?"#4ade80":"#ff7a1a"}"></div></div><div class="sub" style="margin-top:4px">${t.p>=lo?(t.p>hi?"Above":"In")+" target ("+lo+"–"+hi+" g) ✓":(lo-t.p)+" g to go · target "+lo+"–"+hi+" g"}${est?` · ⏳ ${est} meal${est>1?"s":""} estimating…`:""}</div><div style="margin-top:12px"><b style="font-size:18px">${t.c} / ${CG().toLocaleString()}</b> kcal</div><div class="bar"><div style="width:${Math.min(100,t.c/CG()*100)}%;background:${t.c>CG()?"#fbbf24":"#60a5fa"}"></div></div><div class="sub" style="margin-top:4px">${t.c>CG()?(t.c-CG())+" kcal over goal":(CG()-t.c)+" kcal left"} · goal ${CG().toLocaleString()} kcal <a href="#" onclick="const v=prompt('Daily calorie goal (kcal)',CG());if(v&&+v>0){S.ctgt=+v;persist();mTotals()}return false" style="color:#9aa4b2">Edit goal</a></div>`;
-const by={};all.forEach(m=>(by[m.date]=by[m.date]||[]).push(m));const ds=Object.keys(by).filter(d=>d!==mDay).sort().reverse().slice(0,14),hd=$("#mhist");
-if(hd)hd.innerHTML=ds.length?`<h2>Previous days</h2>`+ds.map(d=>{const x=totals(by[d]);return`<div class="sub" style="padding:8px 0;border-top:1px solid #2a3140;cursor:pointer" onclick="mDay='${d}';rMeals()"><b style="color:#e8eaed">${fmtDate(d)}</b> · ${x.p} g protein ${x.p>=lo?"✓":""} · ${x.c} / ${CG()} kcal ${x.c>CG()?"▲":""} · ${by[d].length} meal${by[d].length>1?"s":""}</div>`}).join(""):""}
+}
 function shiftDay(n){const d=new Date(mDay+"T12:00:00");d.setDate(d.getDate()+n);mDay=ld(d);rMeals()}
 async function rMeals(){mDay=mDay||today();$("#title").textContent="Meals";$("#subtitle").textContent="Snap it, share it, track protein";urls.forEach(URL.revokeObjectURL);urls=[];
 const ms=(await mAll()).filter(m=>m.date===mDay),isT=mDay===today();if(view!=="meals")return;
@@ -194,7 +195,7 @@ h+=`<div class="card"><div class="row" style="margin-top:0;align-items:center"><
 <div style="margin-top:6px"><button class="mini primary" onclick="shareMeal('${m.id}')">Share</button><button class="mini" onclick="delMeal('${m.id}')">Delete</button></div></div></div>`}).join("")||'<div class="sub" style="margin-top:8px">No meals logged</div>')+"</div>";
 h+=`<div class="card"><h2>Regulars</h2><div class="sub">Things you have often, tap to log.</div>`+
 QUICK.map(s=>qRow(s,quickCount(ms,s))).join("")+"</div>";
-h+=`<div class="card" id="mhist"></div>`;$("#main").innerHTML=h;mTotals()}
+$("#main").innerHTML=h;mTotals()}
 // ---- Speech-to-text for meal notes ----
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let mnDraft="",rec=null,recBase="";
 function micUI(on,msg){const b=$("#mic");if(b)b.classList.toggle("on",on);const st=$("#micst");if(st)st.textContent=msg||""}
@@ -218,8 +219,9 @@ async function hookSave(){const url=$("#hkurl").value.trim(),key=$("#hkkey").val
  st.textContent="Saving…";try{await api({action:"setHook",url,key});SY.hookUrl=url;SY.hookKey=key;SY.hookOn=!!url;sySave();st.textContent=url?"✓ Saved. Alerts on":"Alerts turned off"}catch(e){st.textContent="⚠ "+e.message}}
 async function hookTest(){const st=$("#hkst");if(!SY.url){alert("Connect Google Drive sync first");return}st.textContent="Sending test…";try{const r=await api({action:"testHook"});st.textContent=r.ok?`Test sent, webhook replied HTTP ${r.status}${r.status>=200&&r.status<300?" ✓":" ⚠"}`:"⚠ "+(r.error||"failed")}catch(e){st.textContent="⚠ "+e.message}}
 function syConnect(url,token){if(!/^https?:\/\//.test(url)||!token){alert("Enter the web app URL and token");return}if(url!==SY.url||token!==SY.token){SY.url=url;SY.token=token;syReset();sySave()}sync(true)}
-async function api(body){const r=await fetch(SY.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({source:"app"},body,{token:SY.token})),redirect:"follow",cache:"no-store"});
- if(!r.ok)throw new Error("HTTP "+r.status);let j;try{j=await r.json()}catch(e){throw new Error("Bad response (check URL / deployment access)")}if(!j.ok)throw new Error(j.error||"error");return j}
+function sySleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function syRetryable(e,status){if(status&&(status>=500||status===429||status===408))return true;const m=String(e&&e.message||e);if(/unauthorized|unknown action|bad json|bad type\/id/i.test(m))return false;return /HTTP 5\d\d|HTTP 429|HTTP 408|Failed to fetch|NetworkError|Load failed|TypeError|SSL|EOF|timeout|network|offline|Bad response/i.test(m)}
+async function api(body){let last;for(let i=0;i<3;i++){try{if(!navigator.onLine)throw new Error("offline");const r=await fetch(SY.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({source:"app"},body,{token:SY.token})),redirect:"follow",cache:"no-store"});if(!r.ok){const err=new Error("HTTP "+r.status);if(i<2&&syRetryable(err,r.status)){await sySleep(400*(i+1));continue}throw err}let j;try{j=await r.json()}catch(e){throw new Error("Bad response (check URL / deployment access)")}if(!j.ok)throw new Error(j.error||"error");return j}catch(e){last=e;const m=String(e&&e.message||e);if(m==="offline")throw e;if(i<2&&syRetryable(e)){await sySleep(400*(i+1));continue}throw e}}throw last}
 async function localRecs(){const m={};["sessions","cardio","body","daily"].forEach(t=>S[t].forEach(r=>m[t+":"+r.id]={type:t,id:r.id,data:r}));m["plan:plan"]={type:"plan",id:"plan",data:{plan:S.plan}};
  (await mAll()).forEach(x=>{const{img,...d}=x;delete d.updatedAt;m["meals:"+x.id]={type:"meals",id:x.id,data:d,rec:x}});return m}
 function scan(L){SY.sh=SY.sh||{};SY.dirty=SY.dirty||{};SY.ut=SY.ut||{};const now=Date.now();
@@ -227,10 +229,12 @@ function scan(L){SY.sh=SY.sh||{};SY.dirty=SY.dirty||{};SY.ut=SY.ut||{};const now
  for(const k in SY.sh)if(!L[k]&&!SY.dirty[k])SY.dirty[k]=Math.max(now,(SY.ut[k]||0)+1)}
 const pendingN=()=>Object.keys(SY.dirty||{}).length;
 let remoteChanged=false;
-async function applyRemote(r,L){const k=r.type+":"+r.id;if(SY.dirty[k]&&SY.dirty[k]>=r.updatedAt)return;if(!SY.dirty[k]&&(SY.ut[k]||0)>=r.updatedAt&&(r.deleted?!L[k]:SY.sh[k]===JSON.stringify(r.data)))return;
+async function applyRemote(r,L){const k=r.type+":"+r.id;
+ if(r.type==="meals"&&!r.deleted&&r.data){const cur=L[k]&&L[k].rec;if(cur&&keepMealMacros(cur,r.data)){await mPut(cur);if(L[k]){const{img,...dd}=cur;delete dd.updatedAt;L[k].rec=cur;L[k].data=dd}remoteChanged=true}}
+ if(SY.dirty[k]&&SY.dirty[k]>=r.updatedAt)return;if(!SY.dirty[k]&&(SY.ut[k]||0)>=r.updatedAt&&(r.deleted?!L[k]:SY.sh[k]===JSON.stringify(r.data)))return;
  if(r.deleted){if(r.type==="meals")await mDel(r.id);else if(r.type!=="plan")S[r.type]=S[r.type].filter(x=>x.id!==r.id);delete SY.sh[k]}
  else{const d=r.data;if(r.type==="plan"){S.plan=d.plan;ensureCore(S.plan);const dk=S.draft[draftKey()];if(dk&&!dk.ex.some(e=>e.sets.some(x=>x.done)))delete S.draft[draftKey()]}
-  else if(r.type==="meals"){const old=L[k]&&L[k].rec;await mPut(Object.assign({},d,{img:old&&old.img&&old.photoId===d.photoId?old.img:(old&&old.img&&!d.photoId?old.img:null)}))}
+  else if(r.type==="meals"){const old=L[k]&&L[k].rec;const d2=Object.assign({},d);if(old)keepMealMacros(d2,old);await mPut(Object.assign({},d2,{img:old&&old.img&&old.photoId===d2.photoId?old.img:(old&&old.img&&!d2.photoId?old.img:null)}))}
   else{const a=S[r.type],i=a.findIndex(x=>x.id===r.id);if(i>=0)a[i]=d;else{a.push(d);a.sort((x,y)=>String(x.date).localeCompare(String(y.date)))}}
   SY.sh[k]=JSON.stringify(d)}
  delete SY.dirty[k];SY.ut[k]=r.updatedAt;remoteChanged=true}
@@ -242,9 +246,12 @@ async function doSync(manual){remoteChanged=false;
   const pr=await api({action:"pull",since:Math.max(0,(SY.since||0)-5000)});
   for(const r of pr.records)await applyRemote(r,L);persist();
   L=await localRecs();scan(L);const keys=Object.keys(SY.dirty),recs=[];
+  const blankMeal=keys.some(k=>{const l=L[k];return l&&l.type==="meals"&&(!mealFilled(l.data.cal)||!mealFilled(l.data.prot))});
+  let mealSrc={};if(blankMeal){const extra=await api({action:"pull",since:0,types:["meals"]});for(const r of extra.records){if(r.type==="meals"&&!r.deleted&&r.data){mealSrc[r.id]=r.data;await applyRemote(r,L)}}L=await localRecs();scan(L)}
   for(const k of keys){const[t,...rest]=k.split(":"),id=rest.join(":"),l=L[k];
    if(!l){recs.push({type:t,id,updatedAt:SY.dirty[k],deleted:true});continue}
    if(t==="meals"&&l.rec.img&&!l.data.photoId){const up=await api({action:"uploadPhoto",mealId:id,date:l.data.date,base64:await b2d(l.rec.img)});l.rec.photoId=up.fileId;await mPut(l.rec);l.data.photoId=up.fileId}
+   if(t==="meals"&&mealSrc[id]&&keepMealMacros(l.data,mealSrc[id])){if(l.rec){keepMealMacros(l.rec,l.data);await mPut(l.rec)}remoteChanged=true}
    recs.push({type:t,id,updatedAt:SY.dirty[k],data:l.data})}
   if(recs.length){const quiet=recs.filter(isSupRec),chunks=[[recs.filter(r=>!isSupRec(r)),"app"],[quiet,"bot"]];
    for(const [chunk,src] of chunks){if(!chunk.length)continue;const ur=await api({action:"upsert",source:src,records:chunk});

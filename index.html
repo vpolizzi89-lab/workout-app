@@ -156,7 +156,8 @@ const txt=`Meals for ${fmtDate(mDay)} (${ms.length}):\n`+ms.map(m=>"- "+mealText
 function totals(ms){return ms.reduce((a,m)=>({c:a.c+(+m.cal||0),p:a.p+(+m.prot||0)}),{c:0,p:0})}
 const SUPS=[
 {id:"shake",label:"Protein shake (2 scoops + water)",cal:270,prot:60,detail:"270 cal · 60 g protein",note:"Protein shake (2 scoops + water): Body Fortress Super Advanced Isolate, 2 scoops (76 g). 270 cal, 60 g protein, 1.5 g fat, 5 g carbs.",re:/protein shake|body fortress|2 scoops \+ water/i},
-{id:"creatine",label:"Creatine (1 scoop)",cal:5,prot:0,detail:"5 cal · 0 g protein",note:"Creatine (1 scoop): PMD CG5 Creatine + Glutamine, 1 scoop (5.2 g). 5 cal, 0 g protein.",re:/\bcreatine\b/i}];
+{id:"creatine",label:"Creatine (1 scoop)",cal:5,prot:0,detail:"5 cal · 0 g protein",note:"Creatine (1 scoop): PMD CG5 Creatine + Glutamine, 1 scoop (5.2 g). 5 cal, 0 g protein.",re:/\bcreatine\b/i},
+{id:"broth",label:"Bone broth (1 packet)",cal:50,prot:10,detail:"50 cal · 10 g protein",note:"Bone broth (1 packet + water): Bare Bones Instant Bone Broth, Beef, 1 packet (15 g). 50 cal, 10 g protein, 0 g fat, 3 g carbs.",re:/bone broth|bare bones/i}];
 function isSupRec(r){return r&&r.type==="meals"&&((r.data&&r.data.supp)||/^supp-/.test(String(r.id||"")))}
 function mealFilled(v){return v!=null&&String(v).trim()!==""}
 function keepMealMacros(dst,src){if(!dst||!src)return false;let ch=false;if(!mealFilled(dst.cal)&&mealFilled(src.cal)){dst.cal=src.cal;ch=true}if(!mealFilled(dst.prot)&&mealFilled(src.prot)){dst.prot=src.prot;ch=true}return ch}
